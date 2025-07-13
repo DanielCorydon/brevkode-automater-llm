@@ -1,5 +1,5 @@
 [project]
-name = "brev_kodning_automization"
+name = "brev_kodning_automization_llm"
 version = "0.1.0"
 description = "Default template for PDM package"
 authors = [
@@ -7,15 +7,15 @@ authors = [
 ]
 dependencies = [
     "streamlit>=1.46.1",
-    "pandas>=2.1.1", 
+    "pandas>=2.1.1",
     "openpyxl>=3.1.2",
     "python-docx>=0.8.11",
     "langgraph",
     "langchain",
     "openai[azure]>=1.95.1",
-    "azure-identity"
+    "azure-identity",
 ]
-requires-python = "==3.11.*"
+requires-python = ">=3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
 

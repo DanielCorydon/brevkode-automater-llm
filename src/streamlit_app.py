@@ -90,7 +90,7 @@ st.subheader("3. LLM Prompt og Transformation")
 
 
 # Define a variable for the default LLM prompt text
-DEFAULT_LLM_PROMPT = "perform the usual transformation"
+DEFAULT_LLM_PROMPT = "Skriv de første 3 ord du modtog"
 
 llm_prompt = st.text_area(
     "Indsæt LLM prompt her",
