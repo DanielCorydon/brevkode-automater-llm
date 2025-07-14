@@ -34,3 +34,13 @@ def replace_string_in_text(
     result = input_dict["text"].replace(input_dict["old"], input_dict["new"])
     print(f"[TOOL DEBUG] Result: '{result[:50]}...'")
     return {"modified_text": result}
+
+
+def multiply(a: int, b: int) -> int:
+    """Multiply a and b.
+
+    Args:
+        a: first int
+        b: second int
+    """
+    return a * b

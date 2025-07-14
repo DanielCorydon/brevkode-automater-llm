@@ -14,8 +14,11 @@ dependencies = [
     "openai[azure]>=1.95.1",
     "azure-identity",
     "langchain-openai>=0.3.27",
+    "iPython>=9.4.0",
+    "langgraph-cli[inmem]>=0.3.4",
+    "langchain-core>=0.3.68",
 ]
-requires-python = ">=3.11.*"
+requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "MIT"}
 

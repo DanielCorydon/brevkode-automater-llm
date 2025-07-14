@@ -3,7 +3,10 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
+from langgraph.graph import MessagesState
+from langgraph.prebuilt import ToolNode, tools_condition
 from typing import Annotated
+from components.graph_tools import replace_string_in_text, multiply
 
 
 class State(TypedDict):
@@ -34,6 +37,7 @@ class AzureChatOpenAIWithAAD:
         self.token_provider = get_bearer_token_provider(
             self.credential, "https://cognitiveservices.azure.com/.default"
         )
+        self.graph = None
 
     def create_graph_agent(
         self,
@@ -51,55 +55,42 @@ class AzureChatOpenAIWithAAD:
             azure_ad_token_provider=self.token_provider,
             azure_deployment=azure_deployment,
         )
+        llm_with_tools = llm.bind_tools(
+            # [replace_string_in_text, multiply],
+            [multiply]
+        )
+
+        def tool_calling_llm(state: MessagesState):
+            # LLM should output a dict: {"content": ...} or {"tool_call": {"tool": ..., "tool_input": {...}}}
+            return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
         graph_builder = StateGraph(State)
-
-        def chatbot(state: State):
-            # LLM should output a dict: {"content": ...} or {"tool_call": {"tool": ..., "tool_input": {...}}}
-            return {"messages": [llm.invoke(state["messages"])]}
-
-        def router(state: State):
-            last_message = state["messages"][-1]
-            if isinstance(last_message, dict) and "tool_call" in last_message:
-                return "replace_string_in_text"
-            return END
-
-        def string_replace_tool(state: State):
-            last_message = state["messages"][-1]
-            tool_call = last_message.get("tool_call")
-            if not tool_call or tool_call.get("tool") != "replace_string_in_text":
-                return {"messages": [{"content": "No valid tool_call provided."}]}
-            tool_input = tool_call.get("tool_input")
-            if not tool_input:
-                return {
-                    "messages": [
-                        {"content": "No tool_input provided for string replacement."}
-                    ]
-                }
-            result = replace_string_in_text(tool_input)
-            return {"messages": [{"content": result["modified_text"]}]}
-
-        graph_builder.add_node("chatbot", chatbot)
-        graph_builder.add_node("router", router)
-        graph_builder.add_node("replace_string_in_text", string_replace_tool)
-        graph_builder.add_edge(START, "chatbot")
-        graph_builder.add_edge("chatbot", "router")
-        graph_builder.add_edge(
-            "router",
-            "replace_string_in_text",
-            condition=lambda state: state["messages"][-1]
-            .get("tool_call", {})
-            .get("tool")
-            == "replace_string_in_text",
+        # *** NODES ***
+        graph_builder.add_node(
+            "tool_calling_llm",
+            tool_calling_llm,
         )
-        graph_builder.add_edge(
-            "router",
-            END,
-            condition=lambda state: not (
-                isinstance(state["messages"][-1], dict)
-                and "tool_call" in state["messages"][-1]
-            ),
+        graph_builder.add_node(
+            "tools",
+            # ToolNode([multiply, replace_string_in_text]),
+            ToolNode([multiply]),
         )
-        graph_builder.add_edge("replace_string_in_text", END)
+
+        # *** EDGES ***
+        graph_builder.add_edge(START, "tool_calling_llm")
+        graph_builder.add_conditional_edges(
+            "tool_calling_llm",
+            # If the latest message (result) from assistant is a tool call -> tools_condition routes to tools
+            # If the latest message (result) from assistant is a not a tool call -> tools_condition routes to END
+            tools_condition,
+        )
+        graph_builder.add_edge("tools", END)
+
         self.graph = graph_builder.compile()
         return self.graph
+
+    def get_graph_png_bytes(self) -> bytes:
+        """
+        Returns the graph as PNG bytes for use in Streamlit or web apps.
+        """
+        return self.graph.get_graph().draw_mermaid_png()
