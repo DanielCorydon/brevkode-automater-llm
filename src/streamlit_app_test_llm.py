@@ -32,6 +32,6 @@ graph = azure_Controller.create_graph_agent(
 #         st.error(f"Kunne ikke vise grafen: {e}")
 
 messages = [HumanMessage(content="Hello, what is 2 multiplied by 2?")]
-messages = graph.invoke({"messages": messages})
+messages = graph.invoke({"messages": messages}, recursion_limit=10)
 for m in messages["messages"]:
     m.pretty_print()
