@@ -10,10 +10,10 @@ dependencies = [
     "pandas>=2.1.1",
     "openpyxl>=3.1.2",
     "python-docx>=0.8.11",
-    "langgraph",
-    "langchain",
+    "langgraph>=0.0.4",
     "openai[azure]>=1.95.1",
     "azure-identity",
+    "langchain-openai>=0.3.27",
 ]
 requires-python = ">=3.11.*"
 readme = "README.md"
