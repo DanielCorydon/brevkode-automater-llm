@@ -1,3 +1,32 @@
+# --- Tool: Create a Word document from text ---
+from docx import Document
+import io
+
+
+def text_to_word_docx(text: str, output_path: str = None) -> bytes:
+    """
+    Create a Word (.docx) document from the given text. Each line becomes a paragraph.
+    If output_path is provided, saves the file there. Returns the bytes of the document.
+
+    Args:
+        text (str): The input text.
+        output_path (str, optional): Path to save the .docx file. If None, only returns bytes.
+
+    Returns:
+        bytes: The .docx file as bytes.
+    """
+    doc = Document()
+    for line in text.splitlines():
+        doc.add_paragraph(line)
+    doc_io = io.BytesIO()
+    doc.save(doc_io)
+    doc_bytes = doc_io.getvalue()
+    if output_path:
+        with open(output_path, "wb") as f:
+            f.write(doc_bytes)
+    return doc_bytes
+
+
 """
 Tool functions for document processing and mapping replacements.
 """

@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
-from components.agent import graph, load_excel_mapping
-from components.tools import search_and_replace, replace_titels_with_nogle
+
+# from components.agent import graph, load_excel_mapping
+# from components.tools import search_and_replace, replace_titels_with_nogle
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -130,14 +131,13 @@ st.subheader("3. LLM Prompt og Transformation")
 with st.expander("Om tilgængelige værktøjer", expanded=True):
     st.markdown(
         """
-    **Tilgængelige værktøjer i promptet:**
+    **Værktøjer, du kan bruge i din besked:**
     
-    1. **search_and_replace(text, search, replace)** - Erstatter alle forekomster af 'search' med 'replace' i teksten.
-       - Eksempel: `Using the tool search_and_replace, replace all instances of 'Hello' with 'Goodbye' in the following text:`
+    1. **Find og erstat ord** – Med dette værktøj kan du bede om at få et bestemt ord eller en sætning i teksten skiftet ud med noget andet. For eksempel: Hvis du vil have alle steder, hvor der står "Hej", ændret til "Farvel", så kan du bare skrive det i din besked.
     
-    2. **replace_titels_with_nogle(text, replacement_template)** - Erstatter alle titler fra mapping-filen med en skabelon.
-       - Brug `<NØGLE>` i skabelonen for at indsætte den tilsvarende nøgle.
-       - Eksempel: `Using the tool replace_titels_with_nogle, replace all titles with '{{<NØGLE>}}' in the following text:`
+    2. **Skift titler ud med koder** – Dette værktøj kan automatisk finde alle de titler, der står i din koblingsfil (listen med titler og koder), og bytte dem ud med deres tilhørende kode. Du kan også selv bestemme, hvordan koden skal se ud i teksten. For eksempel: Hvis du vil have alle titler udskiftet med noget andet, kan du skrive det i din besked.
+    
+    Du behøver ikke kende til programmering eller funktioner – bare fortæl, hvad du ønsker, så klarer værktøjerne resten for dig.
     """
     )
 
@@ -202,15 +202,15 @@ if st.button("Begin transformation"):
             #     st.markdown(transformed_text)
 
             # --- Mock transformation instead of LLM/agent ---
-            with st.spinner("Processing text (mock mode)..."):
+            with st.spinner("Teksten behandles (demotilstand)..."):
                 result_placeholder = st.empty()
                 mock_result = (
-                    "**[MOCK OUTPUT]**\n"
-                    "Dette er et mock-resultat. Ingen LLM eller AI er brugt.\n\n"
-                    f"Original tekst:\n{input_text}\n\n"
-                    "[Her ville den transformerede tekst normalt blive vist.]"
+                    "**[EKSEMPEL PÅ RESULTAT]**\n"
+                    "Dette er kun et eksempel. Teksten er ikke blevet ændret af et rigtigt program.\n\n"
+                    f"Din originale tekst:\n{input_text}\n\n"
+                    "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]"
                 )
                 result_placeholder.markdown(mock_result)
-                st.success("Mock transformation complete!")
+                st.success("Eksempel på behandling er færdig!")
     except Exception as e:
         st.error(f"Error during mock transformation: {str(e)}")
