@@ -7,7 +7,7 @@ from langgraph.graph import MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 
 # Import tool functions from tools.py
-from tools import (
+from components.tools import (
     search_and_replace,
     replace_titels_with_nogle,
 )
