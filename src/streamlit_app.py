@@ -32,14 +32,14 @@ with st.expander("Om denne app", expanded=False):
         """
     ### Brevkoder-automater
     
-    Dette værktøj hjælper med at transformere tekst ved at erstatte koder eller titler med deres respektive nøgler. 
-    Applikationen bruger en LangGraph agent til at udføre teksttransformationer baseret på AI.
+    Dette værktøj hjælper med at kode tekst ved at erstatte koder eller titler med deres respektive nøgler. 
+    Applikationen bruger en LangGraph agent til at udføre tekstkodning baseret på AI.
     
     **Sådan bruges appen:**
     1. Upload en Excel-fil med titel/nøgle-koblinger eller brug standard-CSV-filen
     2. Upload et Word-dokument eller indtast tekst direkte
-    3. Indtast en prompt til AI-assistenten om, hvordan teksten skal transformeres
-    4. Klik på "Begin transformation" for at starte processen
+    3. Indtast en prompt til AI-assistenten om, hvordan teksten skal kodes
+    4. Klik på "Begin kodning" for at starte processen
     """
     )
 
@@ -98,7 +98,7 @@ st.subheader("2. Upload Word-dokument eller indtast tekst")
 # brevet Skriv titel på brev og dato for udsendelse. De nye oplysninger ændrer ikke den seneste opgørelse af If betingelse
 # Borger enlig ved ældrecheck berettigelse  ”din” Else ”jeres” likvide formue til ældrecheck Årstal indeværende år.
 # """
-DEFAULT_INPUT_TEXT = """Vi skriver til dig, fordi Peter har givet os nye oplysninger om If betingelse Borger enlig ved ældrecheck berettigelse”dine” Else ”din” likvide formue efter den seneste opgørelse i brevet "Goddag"""
+DEFAULT_INPUT_TEXT = """Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet If betingelse Borger enlig ved ældrecheck berettigelse ” dine ” Else ”din og din samlever/ægtefælles” formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen."""
 
 
 col1, col2 = st.columns(2)
@@ -125,7 +125,7 @@ else:
 
 
 # --- Ny sektion: LLM Prompt og Transformation ---
-st.subheader("3. LLM Prompt og Transformation")
+st.subheader("3. Sprogmodel-prompt og Kodning")
 
 # Information about available tools
 with st.expander("Om tilgængelige værktøjer", expanded=True):
@@ -170,20 +170,21 @@ def get_textarea_height(text, min_height=120, max_height=600, line_height=22):
 
 
 llm_prompt = st.text_area(
-    "Indsæt LLM prompt her",
+    "Indsæt sprogmodel-prompt her",
     value=DEFAULT_LLM_PROMPT,
     height=get_textarea_height(DEFAULT_LLM_PROMPT),
     key="llm_prompt_input",
 )
 
-if st.button("Begin transformation"):
+if st.button("Start kodning"):
     try:
         if uploaded_docx is not None:
             st.error("Word document processing not implemented yet")
         else:
-            # --- LLM/agent code (commented out for demo/mock mode) ---
+
+            # --- Sprogmodel/agent kode (udkommenteret for demo/eksempeltilstand) ---
             # combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
-            # with st.spinner("Processing text with AI..."):
+            # with st.spinner("Teksten behandles med sprogmodel..."):
             #     result_placeholder = st.empty()
             #     transformed_text = ""
             #     for event in graph.stream(
@@ -195,10 +196,10 @@ if st.button("Begin transformation"):
             #                 if latest_message:
             #                     transformed_text = latest_message
             #                     result_placeholder.markdown(
-            #                         f"**Processing output:**\n{transformed_text}"
+            #                         f"**Behandlingens resultat:**\n{transformed_text}"
             #                     )
-            #     st.success("Transformation complete!")
-            #     st.subheader("Result:")
+            #     st.success("Transformationen er færdig!")
+            #     st.subheader("Resultat:")
             #     st.markdown(transformed_text)
 
             # --- Mock transformation instead of LLM/agent ---
@@ -208,9 +209,10 @@ if st.button("Begin transformation"):
                     "**[EKSEMPEL PÅ RESULTAT]**\n"
                     "Dette er kun et eksempel. Teksten er ikke blevet ændret af et rigtigt program.\n\n"
                     f"Din originale tekst:\n{input_text}\n\n"
-                    "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]"
+                    "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]. Et eksempel på en kodning af det ovenstående kunne være:\n\n"
+                    'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
                 )
                 result_placeholder.markdown(mock_result)
-                st.success("Eksempel på behandling er færdig!")
+                st.success("Eksempel på kodning er færdig!")
     except Exception as e:
-        st.error(f"Error during mock transformation: {str(e)}")
+        st.error(f"Error during mock kodning: {str(e)}")
