@@ -161,10 +161,18 @@ Efter transformation:
 "
 Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" " dine" "din og din samlever/ægtefælles "  formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen."""
 
+
+# Dynamically set the height based on the number of lines in the prompt (min 6, max 30 lines)
+def get_textarea_height(text, min_height=120, max_height=600, line_height=22):
+    num_lines = text.count("\n") + 1
+    height = min_height + (num_lines - 6) * line_height if num_lines > 6 else min_height
+    return min(max(height, min_height), max_height)
+
+
 llm_prompt = st.text_area(
     "Indsæt LLM prompt her",
     value=DEFAULT_LLM_PROMPT,
-    height=120,
+    height=get_textarea_height(DEFAULT_LLM_PROMPT),
     key="llm_prompt_input",
 )
 
@@ -173,32 +181,36 @@ if st.button("Begin transformation"):
         if uploaded_docx is not None:
             st.error("Word document processing not implemented yet")
         else:
-            # Create a combined prompt with instructions and text to process
-            combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
+            # --- LLM/agent code (commented out for demo/mock mode) ---
+            # combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
+            # with st.spinner("Processing text with AI..."):
+            #     result_placeholder = st.empty()
+            #     transformed_text = ""
+            #     for event in graph.stream(
+            #         {"messages": [{"role": "user", "content": combined_prompt}]}
+            #     ):
+            #         for value in event.values():
+            #             if value["messages"] and len(value["messages"]) > 0:
+            #                 latest_message = value["messages"][-1].content
+            #                 if latest_message:
+            #                     transformed_text = latest_message
+            #                     result_placeholder.markdown(
+            #                         f"**Processing output:**\n{transformed_text}"
+            #                     )
+            #     st.success("Transformation complete!")
+            #     st.subheader("Result:")
+            #     st.markdown(transformed_text)
 
-            # Display a spinner while processing
-            with st.spinner("Processing text with AI..."):
-                # Create placeholder for streaming output
+            # --- Mock transformation instead of LLM/agent ---
+            with st.spinner("Processing text (mock mode)..."):
                 result_placeholder = st.empty()
-                transformed_text = ""
-
-                # Stream results from the agent
-                for event in graph.stream(
-                    {"messages": [{"role": "user", "content": combined_prompt}]}
-                ):
-                    for value in event.values():
-                        if value["messages"] and len(value["messages"]) > 0:
-                            latest_message = value["messages"][-1].content
-                            if latest_message:
-                                transformed_text = latest_message
-                                result_placeholder.markdown(
-                                    f"**Processing output:**\n{transformed_text}"
-                                )
-
-                # Final output display
-                st.success("Transformation complete!")
-                st.subheader("Result:")
-                st.markdown(transformed_text)
-
+                mock_result = (
+                    "**[MOCK OUTPUT]**\n"
+                    "Dette er et mock-resultat. Ingen LLM eller AI er brugt.\n\n"
+                    f"Original tekst:\n{input_text}\n\n"
+                    "[Her ville den transformerede tekst normalt blive vist.]"
+                )
+                result_placeholder.markdown(mock_result)
+                st.success("Mock transformation complete!")
     except Exception as e:
-        st.error(f"Error during transformation: {str(e)}")
+        st.error(f"Error during mock transformation: {str(e)}")
