@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
-from components.agent import graph, load_excel_mapping
-from components.tools import search_and_replace, replace_titels_with_nogle
+from components.tools import text_to_word_docx, convert_text_to_mergefields
+
+# from components.agent import graph, load_excel_mapping
+# from components.tools import search_and_replace, replace_titels_with_nogle
 
 # logging.basicConfig(level=logging.DEBUG)
 
@@ -31,14 +33,14 @@ with st.expander("Om denne app", expanded=False):
         """
     ### Brevkoder-automater
     
-    Dette værktøj hjælper med at transformere tekst ved at erstatte koder eller titler med deres respektive nøgler. 
-    Applikationen bruger en LangGraph agent til at udføre teksttransformationer baseret på AI.
+    Dette værktøj hjælper med at kode tekst ved at erstatte koder eller titler med deres respektive nøgler. 
+    Applikationen bruger en LangGraph agent til at udføre tekstkodning baseret på AI.
     
     **Sådan bruges appen:**
     1. Upload en Excel-fil med titel/nøgle-koblinger eller brug standard-CSV-filen
     2. Upload et Word-dokument eller indtast tekst direkte
-    3. Indtast en prompt til AI-assistenten om, hvordan teksten skal transformeres
-    4. Klik på "Begin transformation" for at starte processen
+    3. Indtast en prompt til AI-assistenten om, hvordan teksten skal kodes
+    4. Klik på "Begin kodning" for at starte processen
     """
     )
 
@@ -97,7 +99,7 @@ st.subheader("2. Upload Word-dokument eller indtast tekst")
 # brevet Skriv titel på brev og dato for udsendelse. De nye oplysninger ændrer ikke den seneste opgørelse af If betingelse
 # Borger enlig ved ældrecheck berettigelse  ”din” Else ”jeres” likvide formue til ældrecheck Årstal indeværende år.
 # """
-DEFAULT_INPUT_TEXT = """Vi skriver til dig, fordi Peter har givet os nye oplysninger om If betingelse Borger enlig ved ældrecheck berettigelse”dine” Else ”din” likvide formue efter den seneste opgørelse i brevet "Goddag"""
+DEFAULT_INPUT_TEXT = """Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet If betingelse Borger enlig ved ældrecheck berettigelse ” dine ” Else ”din og din samlever/ægtefælles” formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen."""
 
 
 col1, col2 = st.columns(2)
@@ -124,20 +126,19 @@ else:
 
 
 # --- Ny sektion: LLM Prompt og Transformation ---
-st.subheader("3. LLM Prompt og Transformation")
+st.subheader("3. Sprogmodel-prompt og Kodning")
 
 # Information about available tools
 with st.expander("Om tilgængelige værktøjer", expanded=True):
     st.markdown(
         """
-    **Tilgængelige værktøjer i promptet:**
+    **Værktøjer, du kan bruge i din besked:**
     
-    1. **search_and_replace(text, search, replace)** - Erstatter alle forekomster af 'search' med 'replace' i teksten.
-       - Eksempel: `Using the tool search_and_replace, replace all instances of 'Hello' with 'Goodbye' in the following text:`
+    1. **Find og erstat ord** – Med dette værktøj kan du bede om at få et bestemt ord eller en sætning i teksten skiftet ud med noget andet. For eksempel: Hvis du vil have alle steder, hvor der står "Hej", ændret til "Farvel", så kan du bare skrive det i din besked.
     
-    2. **replace_titels_with_nogle(text, replacement_template)** - Erstatter alle titler fra mapping-filen med en skabelon.
-       - Brug `<NØGLE>` i skabelonen for at indsætte den tilsvarende nøgle.
-       - Eksempel: `Using the tool replace_titels_with_nogle, replace all titles with '{{<NØGLE>}}' in the following text:`
+    2. **Skift titler ud med koder** – Dette værktøj kan automatisk finde alle de titler, der står i din koblingsfil (listen med titler og koder), og bytte dem ud med deres tilhørende kode. Du kan også selv bestemme, hvordan koden skal se ud i teksten. For eksempel: Hvis du vil have alle titler udskiftet med noget andet, kan du skrive det i din besked.
+    
+    Du behøver ikke kende til programmering eller funktioner – bare fortæl, hvad du ønsker, så klarer værktøjerne resten for dig.
     """
     )
 
@@ -161,44 +162,164 @@ Efter transformation:
 "
 Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" " dine" "din og din samlever/ægtefælles "  formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen."""
 
+
+# Dynamically set the height based on the number of lines in the prompt (min 6, max 30 lines)
+def get_textarea_height(text, min_height=120, max_height=600, line_height=22):
+    num_lines = text.count("\n") + 1
+    height = min_height + (num_lines - 6) * line_height if num_lines > 6 else min_height
+    return min(max(height, min_height), max_height)
+
+
 llm_prompt = st.text_area(
-    "Indsæt LLM prompt her",
+    "Indsæt sprogmodel-prompt her",
     value=DEFAULT_LLM_PROMPT,
-    height=120,
+    height=get_textarea_height(DEFAULT_LLM_PROMPT),
     key="llm_prompt_input",
 )
 
-if st.button("Begin transformation"):
+
+# Session state to store the output for download
+def get_mock_result(input_text):
+    return (
+        "**[EKSEMPEL PÅ RESULTAT]**\n"
+        "Dette er kun et eksempel. Teksten er ikke blevet ændret af et rigtigt program.\n\n"
+        f"Din originale tekst:\n{input_text}\n\n"
+        "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]. Et eksempel på en kodning af det ovenstående kunne være:\n\n"
+        'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
+    )
+
+
+if "kodning_output" not in st.session_state:
+    st.session_state["kodning_output"] = None
+
+
+if st.button("Start kodning"):
     try:
         if uploaded_docx is not None:
-            st.error("Word document processing not implemented yet")
+            # Process the uploaded Word document (mock: just extract text, real: would use LLM/agent)
+            # For demo, just use the mock result and write it to a .docx, then convert mergefields
+            with st.spinner("Word-dokument behandles og mergefields indsættes..."):
+                import tempfile
+
+                # Generate mock result with special focus on the exact IF pattern example
+                mock_result = 'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
+
+                # Save mock result as docx
+                # Create a temporary file
+                import os
+
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".docx"
+                ) as tmp_docx:
+                    tmp_path = tmp_docx.name
+
+                try:
+                    # Convert text to Word document
+                    text_to_word_docx(mock_result, tmp_path)
+
+                    # Convert mergefield-like text to real mergefields
+                    success, debug_info = convert_text_to_mergefields(
+                        tmp_path, tmp_path
+                    )
+
+                    # Read the bytes for download
+                    with open(tmp_path, "rb") as f:
+                        doc_bytes = f.read()
+
+                    if success:
+                        st.success(
+                            f"Word-dokument med mergefields er klar til download!"
+                        )
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+                    else:
+                        st.warning(
+                            f"Bemærk: Ingen felter blev konverteret. {debug_info}"
+                        )
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+
+                    st.session_state["kodning_output"] = (
+                        None  # No text output for Word doc
+                    )
+
+                except Exception as e:
+                    st.error(f"Fejl under konvertering: {str(e)}")
+                    import traceback
+
+                    st.error(f"Detaljer: {traceback.format_exc()}")
+                finally:
+                    # Clean up the temporary file
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.unlink(tmp_path)
+                        except:
+                            pass
         else:
-            # Create a combined prompt with instructions and text to process
-            combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
+            # --- Sprogmodel/agent kode (udkommenteret for demo/eksempeltilstand) ---
+            # combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
+            # with st.spinner("Teksten behandles med sprogmodel..."):
+            #     result_placeholder = st.empty()
+            #     transformed_text = ""
+            #     for event in graph.stream(
+            #         {"messages": [{"role": "user", "content": combined_prompt}]}
+            #     ):
+            #         for value in event.values():
+            #             if value["messages"] and len(value["messages"]) > 0:
+            #                 latest_message = value["messages"][-1].content
+            #                 if latest_message:
+            #                     transformed_text = latest_message
+            #                     result_placeholder.markdown(
+            #                         f"**Behandlingens resultat:**\n{transformed_text}"
+            #                     )
+            #     st.success("Transformationen er færdig!")
+            #     st.subheader("Resultat:")
+            #     st.markdown(transformed_text)
 
-            # Display a spinner while processing
-            with st.spinner("Processing text with AI..."):
-                # Create placeholder for streaming output
-                result_placeholder = st.empty()
-                transformed_text = ""
+            # --- Mock transformation instead of LLM/agent ---
+            with st.spinner("Teksten behandles (demotilstand)..."):
+                mock_result = get_mock_result(input_text)
+                st.session_state["kodning_output"] = mock_result
 
-                # Stream results from the agent
-                for event in graph.stream(
-                    {"messages": [{"role": "user", "content": combined_prompt}]}
-                ):
-                    for value in event.values():
-                        if value["messages"] and len(value["messages"]) > 0:
-                            latest_message = value["messages"][-1].content
-                            if latest_message:
-                                transformed_text = latest_message
-                                result_placeholder.markdown(
-                                    f"**Processing output:**\n{transformed_text}"
-                                )
+                # Create a temporary docx for conversion
+                import tempfile
 
-                # Final output display
-                st.success("Transformation complete!")
-                st.subheader("Result:")
-                st.markdown(transformed_text)
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".docx"
+                ) as tmp_docx:
+                    text_to_word_docx(mock_result, tmp_docx.name)
+                    try:
+                        # Convert mergefield-like text to real mergefields
+                        success, debug_info = convert_text_to_mergefields(
+                            tmp_docx.name, tmp_docx.name
+                        )
+                        # Read the bytes for download
+                        with open(tmp_docx.name, "rb") as f:
+                            doc_bytes = f.read()
 
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+
+                        # if success:
+                        #     st.success(f"Eksempel på kodning er færdig! {debug_info if debug_info else ''}")
+                        # else:
+                        #     st.warning(f"Ingen mergefields blev fundet i teksten. {debug_info if debug_info else ''}")
+                    except Exception as e:
+                        st.error(f"Fejl under konvertering af mergefields: {str(e)}")
+                        import traceback
+
+                        st.error(f"Detaljer: {traceback.format_exc()}")
     except Exception as e:
-        st.error(f"Error during transformation: {str(e)}")
+        st.error(f"Error during mock kodning: {str(e)}")
+        st.session_state["kodning_output"] = None
+        st.session_state["kodning_docx_bytes"] = None
+
+# Only show the download button if output exists
+if st.session_state.get("kodning_output"):
+    # Always show the output text
+    st.markdown(st.session_state["kodning_output"])
+
+if st.session_state.get("kodning_docx_bytes"):
+    st.download_button(
+        label="Download som Word-dokument",
+        data=st.session_state["kodning_docx_bytes"],
+        file_name="transformed_text.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
