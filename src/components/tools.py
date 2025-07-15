@@ -111,7 +111,7 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
     Args:
         docx_path (str): Path to the input .docx file.
         output_path (str, optional): Path to save the modified .docx file. If None, overwrites the input file.
-    
+
     Returns:
         tuple: (bool, str) - Success flag and debug info
     """
@@ -120,43 +120,49 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
         from docx import Document
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
-        
+
         doc = Document(docx_path)
         debug_info = []
         conversion_count = 0
 
         # Simplified patterns for direct match
         mergefield_pattern = re.compile(r"\{ *MERGEFIELD +([^\} ]+) *\}")
-        
+
         # Exact pattern for the example
-        if_pattern = re.compile(r'\{\s*IF\s+"J"\s+"{\s*MERGEFIELD\s+([\w\-:]+)\s*}"\s+"([^"]*)"\s+"([^"]*)"\s*\}')
-        
+        if_pattern = re.compile(
+            r'\{\s*IF\s+"J"\s+"{\s*MERGEFIELD\s+([\w\-:]+)\s*}"\s+"([^"]*)"\s+"([^"]*)"\s*\}'
+        )
+
         # More generic pattern as fallback
-        if_pattern_generic = re.compile(r'\{\s*IF\s+"([^"]+)"\s+"{\s*MERGEFIELD\s+([\w\-:]+)\s*}"\s+"([^"]*)"\s+"([^"]*)"\s*\}')
+        if_pattern_generic = re.compile(
+            r'\{\s*IF\s+"([^"]+)"\s+"{\s*MERGEFIELD\s+([\w\-:]+)\s*}"\s+"([^"]*)"\s+"([^"]*)"\s*\}'
+        )
 
         debug_info.append(f"Processing document: {docx_path}")
 
         # Define helper function to create merge fields
         def create_merge_field(run, field_name):
             run.text = ""
-            
+
             # Create field begin
-            fldChar1 = OxmlElement('w:fldChar')
-            fldChar1.set(qn('w:fldCharType'), 'begin')
-            
+            fldChar1 = OxmlElement("w:fldChar")
+            fldChar1.set(qn("w:fldCharType"), "begin")
+
             # Create instruction text
-            instrText = OxmlElement('w:instrText')
-            instrText.set(qn('xml:space'), 'preserve')  # Important to preserve whitespace
-            instrText.text = f' MERGEFIELD {field_name} '
-            
+            instrText = OxmlElement("w:instrText")
+            instrText.set(
+                qn("xml:space"), "preserve"
+            )  # Important to preserve whitespace
+            instrText.text = f" MERGEFIELD {field_name} "
+
             # Create field separator
-            fldChar2 = OxmlElement('w:fldChar')
-            fldChar2.set(qn('w:fldCharType'), 'separate')
-            
+            fldChar2 = OxmlElement("w:fldChar")
+            fldChar2.set(qn("w:fldCharType"), "separate")
+
             # Create field end
-            fldChar3 = OxmlElement('w:fldChar')
-            fldChar3.set(qn('w:fldCharType'), 'end')
-            
+            fldChar3 = OxmlElement("w:fldChar")
+            fldChar3.set(qn("w:fldCharType"), "end")
+
             # Append elements
             r = run._r
             r.append(fldChar1)
@@ -169,33 +175,35 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
             # Remove all runs in the paragraph
             for run in list(paragraph.runs):
                 paragraph._element.remove(run._element)
-            
+
             # Add new run for the field
             run = paragraph.add_run()
             r = run._r
-            
+
             # Create field begin
-            fldChar1 = OxmlElement('w:fldChar')
-            fldChar1.set(qn('w:fldCharType'), 'begin')
-            
+            fldChar1 = OxmlElement("w:fldChar")
+            fldChar1.set(qn("w:fldCharType"), "begin")
+
             # Create instruction text
-            instrText = OxmlElement('w:instrText')
-            instrText.set(qn('xml:space'), 'preserve')  # Important to preserve whitespace
-            
+            instrText = OxmlElement("w:instrText")
+            instrText.set(
+                qn("xml:space"), "preserve"
+            )  # Important to preserve whitespace
+
             # Special format for the case where condition is "J"
             if cond == "J":
                 instrText.text = f' IF "J" = "{{ MERGEFIELD {mergefield} }}" "{true_text}" "{false_text}" '
             else:
                 instrText.text = f' IF "{cond}" "{{ MERGEFIELD {mergefield} }}" "{true_text}" "{false_text}" '
-            
+
             # Create field separator
-            fldChar2 = OxmlElement('w:fldChar')
-            fldChar2.set(qn('w:fldCharType'), 'separate')
-            
+            fldChar2 = OxmlElement("w:fldChar")
+            fldChar2.set(qn("w:fldCharType"), "separate")
+
             # Create field end
-            fldChar3 = OxmlElement('w:fldChar')
-            fldChar3.set(qn('w:fldCharType'), 'end')
-            
+            fldChar3 = OxmlElement("w:fldChar")
+            fldChar3.set(qn("w:fldCharType"), "end")
+
             # Append elements
             r.append(fldChar1)
             r.append(instrText)
@@ -206,18 +214,20 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
         for i, para in enumerate(doc.paragraphs):
             para_text = para.text.strip()
             debug_info.append(f"Processing paragraph {i+1}: '{para_text[:50]}...'")
-            
+
             # Look for the exact match first - this is crucial for the example line
             m = if_pattern.search(para_text)
             if m:
                 mergefield_name = m.group(1)
                 true_text = m.group(2)
                 false_text = m.group(3)
-                debug_info.append(f"Found exact IF pattern with mergefield: {mergefield_name}")
+                debug_info.append(
+                    f"Found exact IF pattern with mergefield: {mergefield_name}"
+                )
                 create_if_field(para, "J", mergefield_name, true_text, false_text)
                 conversion_count += 1
                 continue
-                
+
             # Try the generic pattern as fallback
             m = if_pattern_generic.search(para_text)
             if m:
@@ -225,11 +235,13 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
                 mergefield_name = m.group(2)
                 true_text = m.group(3)
                 false_text = m.group(4)
-                debug_info.append(f"Found generic IF pattern with condition: {cond}, mergefield: {mergefield_name}")
+                debug_info.append(
+                    f"Found generic IF pattern with condition: {cond}, mergefield: {mergefield_name}"
+                )
                 create_if_field(para, cond, mergefield_name, true_text, false_text)
                 conversion_count += 1
                 continue
-                
+
             # Otherwise, search for MERGEFIELDs in runs
             for run in para.runs:
                 matches = list(mergefield_pattern.finditer(run.text))
@@ -252,13 +264,14 @@ def convert_text_to_mergefields(docx_path: str, output_path: str = None) -> tupl
         if output_path is None:
             output_path = docx_path
         doc.save(output_path)
-        
+
         debug_message = f"Converted {conversion_count} fields"
         if debug_info:
             debug_message += f"\nDebug info: {', '.join(debug_info)}"
         return (conversion_count > 0, debug_message)
-        
+
     except Exception as e:
         import traceback
+
         error_details = traceback.format_exc()
         return (False, f"Error: {str(e)}\n{error_details}")
