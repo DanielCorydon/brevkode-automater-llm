@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
+from components.tools import text_to_word_docx, convert_text_to_mergefields
 
 # from components.agent import graph, load_excel_mapping
 # from components.tools import search_and_replace, replace_titels_with_nogle
@@ -176,12 +177,83 @@ llm_prompt = st.text_area(
     key="llm_prompt_input",
 )
 
+
+# Session state to store the output for download
+def get_mock_result(input_text):
+    return (
+        "**[EKSEMPEL PÅ RESULTAT]**\n"
+        "Dette er kun et eksempel. Teksten er ikke blevet ændret af et rigtigt program.\n\n"
+        f"Din originale tekst:\n{input_text}\n\n"
+        "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]. Et eksempel på en kodning af det ovenstående kunne være:\n\n"
+        'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
+    )
+
+
+if "kodning_output" not in st.session_state:
+    st.session_state["kodning_output"] = None
+
+
 if st.button("Start kodning"):
     try:
         if uploaded_docx is not None:
-            st.error("Word document processing not implemented yet")
-        else:
+            # Process the uploaded Word document (mock: just extract text, real: would use LLM/agent)
+            # For demo, just use the mock result and write it to a .docx, then convert mergefields
+            with st.spinner("Word-dokument behandles og mergefields indsættes..."):
+                import tempfile
 
+                # Generate mock result with special focus on the exact IF pattern example
+                mock_result = 'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
+
+                # Save mock result as docx
+                # Create a temporary file
+                import os
+
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".docx"
+                ) as tmp_docx:
+                    tmp_path = tmp_docx.name
+
+                try:
+                    # Convert text to Word document
+                    text_to_word_docx(mock_result, tmp_path)
+
+                    # Convert mergefield-like text to real mergefields
+                    success, debug_info = convert_text_to_mergefields(
+                        tmp_path, tmp_path
+                    )
+
+                    # Read the bytes for download
+                    with open(tmp_path, "rb") as f:
+                        doc_bytes = f.read()
+
+                    if success:
+                        st.success(
+                            f"Word-dokument med mergefields er klar til download!"
+                        )
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+                    else:
+                        st.warning(
+                            f"Bemærk: Ingen felter blev konverteret. {debug_info}"
+                        )
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+
+                    st.session_state["kodning_output"] = (
+                        None  # No text output for Word doc
+                    )
+
+                except Exception as e:
+                    st.error(f"Fejl under konvertering: {str(e)}")
+                    import traceback
+
+                    st.error(f"Detaljer: {traceback.format_exc()}")
+                finally:
+                    # Clean up the temporary file
+                    if os.path.exists(tmp_path):
+                        try:
+                            os.unlink(tmp_path)
+                        except:
+                            pass
+        else:
             # --- Sprogmodel/agent kode (udkommenteret for demo/eksempeltilstand) ---
             # combined_prompt = f"{llm_prompt}\n\nText to process:\n{input_text}"
             # with st.spinner("Teksten behandles med sprogmodel..."):
@@ -204,15 +276,50 @@ if st.button("Start kodning"):
 
             # --- Mock transformation instead of LLM/agent ---
             with st.spinner("Teksten behandles (demotilstand)..."):
-                result_placeholder = st.empty()
-                mock_result = (
-                    "**[EKSEMPEL PÅ RESULTAT]**\n"
-                    "Dette er kun et eksempel. Teksten er ikke blevet ændret af et rigtigt program.\n\n"
-                    f"Din originale tekst:\n{input_text}\n\n"
-                    "[Her ville du normalt se den færdige, ændrede tekst, når værktøjet er klar.]. Et eksempel på en kodning af det ovenstående kunne være:\n\n"
-                    'Vi lægger desuden vægt på, at det også af afgørelsen om ældrecheck fremgik, at vi ved opgørelsen af din likvide formue havde hentet { IF "J" "{ MERGEFIELD ab-borger-enlig-ved-aeldrecheck-berettigelse }" "dine" "din og din samlever/ægtefælles" } formueoplysninger fra seneste årsopgørelse fra Skattestyrelsen.'
-                )
-                result_placeholder.markdown(mock_result)
-                st.success("Eksempel på kodning er færdig!")
+                mock_result = get_mock_result(input_text)
+                st.session_state["kodning_output"] = mock_result
+
+                # Create a temporary docx for conversion
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=".docx"
+                ) as tmp_docx:
+                    text_to_word_docx(mock_result, tmp_docx.name)
+                    try:
+                        # Convert mergefield-like text to real mergefields
+                        success, debug_info = convert_text_to_mergefields(
+                            tmp_docx.name, tmp_docx.name
+                        )
+                        # Read the bytes for download
+                        with open(tmp_docx.name, "rb") as f:
+                            doc_bytes = f.read()
+
+                        st.session_state["kodning_docx_bytes"] = doc_bytes
+
+                        # if success:
+                        #     st.success(f"Eksempel på kodning er færdig! {debug_info if debug_info else ''}")
+                        # else:
+                        #     st.warning(f"Ingen mergefields blev fundet i teksten. {debug_info if debug_info else ''}")
+                    except Exception as e:
+                        st.error(f"Fejl under konvertering af mergefields: {str(e)}")
+                        import traceback
+
+                        st.error(f"Detaljer: {traceback.format_exc()}")
     except Exception as e:
         st.error(f"Error during mock kodning: {str(e)}")
+        st.session_state["kodning_output"] = None
+        st.session_state["kodning_docx_bytes"] = None
+
+# Only show the download button if output exists
+if st.session_state.get("kodning_output"):
+    # Always show the output text
+    st.markdown(st.session_state["kodning_output"])
+
+if st.session_state.get("kodning_docx_bytes"):
+    st.download_button(
+        label="Download som Word-dokument",
+        data=st.session_state["kodning_docx_bytes"],
+        file_name="transformed_text.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
